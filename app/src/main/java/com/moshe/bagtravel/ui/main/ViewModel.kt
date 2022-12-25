@@ -13,62 +13,133 @@ import javax.inject.Inject
 @HiltViewModel
 class ViewModel @Inject constructor() : ViewModel(), BagsAdapter.OnBagClickListener {
     private val adapter = BagsAdapter(this)
-    private val travelWeightThreshold = 3.0
+    private val maxTravelWeightThreshold = 3.0
+    private val minTravelWeightThreshold = 1.01
     private val _resultUIState = MutableStateFlow<List<Travel>>(emptyList())
     val resultUIState: StateFlow<List<Travel>> = _resultUIState
 
 
     fun addBag(bag: Bag) {
         adapter.setBag(bag)
-        submitTravels()
+        submitTravels2()
+    }
+
+    private fun submitTravels2() {
+        val travels = mutableListOf<Travel>()
+        val bagsList = adapter.getBagsList().map { Bag(it.id, it.weight, false) }
+
+        addAllBigBags(bagsList, travels)
+
+        val lightBags =
+            bagsList.filter { maxTravelWeightThreshold - it.weight >= minTravelWeightThreshold }
+                .sortedWith(compareByDescending { it.weight })
+
+        for (i in lightBags.indices) {//Choose first bag
+            if (!lightBags[i].taken) {
+                lightBags[i].taken = true
+                val currentBag = lightBags[i]
+                val bags = mutableListOf<Bag>()
+                if (i == lightBags.size - 1) {//Last bag in the list
+                    bags.add(lightBags[i])
+                    travels.add(Travel(ArrayList(bags)))
+                    bags.clear()
+                    break
+                }
+                if (lightBags.size == 1) {
+                    travels.add(Travel(lightBags))
+                    break
+                } else {
+                    for (j in lightBags.indices) {//Choose second bag
+                        if (!lightBags[j].taken && (lightBags[j].weight + currentBag.weight) <= maxTravelWeightThreshold) {
+                            lightBags[j].taken = true
+                            bags.add(currentBag)
+                            bags.add(lightBags[j])
+                            travels.add(Travel(ArrayList(bags)))
+                            bags.clear()
+                            break
+
+                        }
+                    }
+                }
+            }
+        }
+
+        if (travels.isNotEmpty())
+            _resultUIState.value = travels
+    }
+
+    private fun addAllBigBags(
+        bagsList: List<Bag>,
+        travels: MutableList<Travel>
+    ) {
+        bagsList.filter { maxTravelWeightThreshold - it.weight < minTravelWeightThreshold }
+            .forEach {
+                val bags = mutableListOf<Bag>()
+                bags.add(it.copy())
+                travels.add(Travel(bags))
+            }
     }
 
     private fun submitTravels() {
         val travels = mutableListOf<Travel>()
-        val bagsList = adapter.getBagsList().sortedWith(compareByDescending { it.weight })
-        val stack = Stack<Bag>()
-        stack.addAll(bagsList)
+        val bagsList = adapter.getBagsList()
+        val allTravels = mutableListOf<Travel>()
 
-        val bags = mutableListOf<Bag>()
-        while (stack.isNotEmpty()) {
-            bags.add(stack.pop())
-            val sum = bags.sumOf { it.weight }
-
-            if (sum == travelWeightThreshold) {
-                addTravel(travels, bags)
-            } else if (sum > travelWeightThreshold) {
-                returnLastBag(bags, stack)
-                addTravel(travels, bags)
+        bagsList.filter { maxTravelWeightThreshold - it.weight < minTravelWeightThreshold }
+            .forEach {
+                val bags = mutableListOf<Bag>()
+                bags.add(it)
+                travels.add(Travel(bags))
             }
 
-            if (stack.isEmpty() && bags.isNotEmpty()) {
-                travels.add(Travel(ArrayList(bags)))
+        val lightBags =
+            bagsList.filter { maxTravelWeightThreshold - it.weight >= minTravelWeightThreshold }
+
+
+        lightBags.powerSet().forEach {
+            allTravels.add(Travel(ArrayList(it), it.sumOf { it.weight }))
+        }
+
+        val sortedTravels = allTravels.sortedWith(compareByDescending { it.sum })
+
+        sortedTravels.forEach {
+            if (it.sum < maxTravelWeightThreshold && it.sum > 0 && !isTravelsContainBag(
+                    it.bags,
+                    travels
+                )
+            ) {
+                travels.add(it.copy())
             }
         }
 
         _resultUIState.value = travels
+
+
     }
 
-    private fun returnLastBag(
-        bags: MutableList<Bag>,
-        stack: Stack<Bag>
-    ) {
-        val tmp = bags.last()
-        bags.removeLast()
-        stack.push(tmp)
+    private fun isTravelsContainBag(bags: List<Bag>, travelList: List<Travel>): Boolean {
+        travelList.forEach { travel ->
+            travel.bags.forEach { bag ->
+                bags.forEach {
+                    if (it == bag) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+
     }
 
-    private fun addTravel(
-        travels: MutableList<Travel>,
-        bags: MutableList<Bag>
-    ) {
-        travels.add(Travel(ArrayList(bags)))
-        bags.clear()
+    private fun <T> Collection<T>.powerSet(): Set<Set<T>> = when {
+        isEmpty() -> setOf(setOf())
+        else -> drop(1).powerSet().let { it + it.map { it + first() } }
     }
+
 
     fun getAdapter() = adapter
     override fun callback(position: Int) {
-        submitTravels()
+        submitTravels2()
         adapter.notifyItemRemoved(position)
     }
 

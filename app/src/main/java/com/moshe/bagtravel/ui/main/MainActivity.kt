@@ -95,7 +95,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveTapped(weightET: EditText, idET: EditText) {
         val weight = weightET.text.toString().toDouble()
-        if (weight <= 3.0 && weight >= 1.1) {
+        if (weight in 1.01..3.0) {
             viewModel.addBag(Bag(idET.text.toString().toInt(), weight))
             dialog.dismiss()
         } else {
