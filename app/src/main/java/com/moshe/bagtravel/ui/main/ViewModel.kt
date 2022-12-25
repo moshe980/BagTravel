@@ -35,14 +35,12 @@ class ViewModel @Inject constructor() : ViewModel(), BagsAdapter.OnBagClickListe
                 .sortedWith(compareByDescending { it.weight })
 
         for (i in lightBags.indices) {//Choose first bag
-            if (!lightBags[i].taken) {
-                lightBags[i].taken = true
+            if (!lightBags[i].isTaken) {
+                lightBags[i].isTaken = true
                 val currentBag = lightBags[i]
                 val bags = mutableListOf<Bag>()
                 if (i == lightBags.size - 1) {//Last bag in the list
-                    bags.add(lightBags[i])
-                    travels.add(Travel(ArrayList(bags)))
-                    bags.clear()
+                    addTravelOfOneBag(bags, lightBags, i, travels)
                     break
                 }
                 if (lightBags.size == 1) {
@@ -50,22 +48,41 @@ class ViewModel @Inject constructor() : ViewModel(), BagsAdapter.OnBagClickListe
                     break
                 } else {
                     for (j in lightBags.indices) {//Choose second bag
-                        if (!lightBags[j].taken && (lightBags[j].weight + currentBag.weight) <= maxTravelWeightThreshold) {
-                            lightBags[j].taken = true
-                            bags.add(currentBag)
-                            bags.add(lightBags[j])
-                            travels.add(Travel(ArrayList(bags)))
-                            bags.clear()
+                        if (!lightBags[j].isTaken && (lightBags[j].weight + currentBag.weight) <= maxTravelWeightThreshold) {
+                            lightBags[j].isTaken = true
+                            addTravelOfTwoBags(lightBags, j, bags, currentBag, travels)
                             break
-
                         }
                     }
                 }
             }
         }
-
         if (travels.isNotEmpty())
             _resultUIState.value = travels
+    }
+
+    private fun addTravelOfTwoBags(
+        lightBags: List<Bag>,
+        j: Int,
+        bags: MutableList<Bag>,
+        currentBag: Bag,
+        travels: MutableList<Travel>
+    ) {
+        bags.add(currentBag)
+        bags.add(lightBags[j])
+        travels.add(Travel(ArrayList(bags)))
+        bags.clear()
+    }
+
+    private fun addTravelOfOneBag(
+        bags: MutableList<Bag>,
+        lightBags: List<Bag>,
+        i: Int,
+        travels: MutableList<Travel>
+    ) {
+        bags.add(lightBags[i])
+        travels.add(Travel(ArrayList(bags)))
+        bags.clear()
     }
 
     private fun addAllBigBags(

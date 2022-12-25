@@ -7,7 +7,7 @@ import kotlinx.parcelize.Parcelize
 data class Bag(
     var id: Int,
     var weight:Double,
-    var taken:Boolean=false
+    var isTaken:Boolean=false
 
 ): Parcelable{
     override fun toString(): String {
